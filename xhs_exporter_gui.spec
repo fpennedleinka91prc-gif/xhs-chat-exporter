@@ -26,10 +26,10 @@ datas = [
 BROWSERS = HERE / 'browsers'
 if BROWSERS.is_dir():
     chromium_size = sum(f.stat().st_size for f in BROWSERS.rglob('*') if f.is_file()) / 1024 / 1024
-    print(f'[spec] Chromium 内核存在（{chromium_size:.0f}MB），将由 shell 脚本拷贝到 dist/_internal/browsers/')
+    print(f'[spec] Chromium found ({chromium_size:.0f}MB), will be copied to dist/_internal/browsers by shell')
 else:
-    print('[spec] ⚠️ 没找到 ./browsers/。请先执行：'
-          'PLAYWRIGHT_BROWSERS_PATH=./browsers python3 -m playwright install chromium')
+    print('[spec] WARNING: no ./browsers/ dir found. Run:'
+          ' PLAYWRIGHT_BROWSERS_PATH=./browsers python3 -m playwright install chromium')
 
 hiddenimports = [
     'playwright.sync_api',
