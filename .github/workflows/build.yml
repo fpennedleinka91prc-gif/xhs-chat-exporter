@@ -16,6 +16,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+# 关键：softprops/action-gh-release 用默认 GITHUB_TOKEN 时，必须显式给 contents: write。
+# 公开仓库下这个权限不会自动继承；没有它创建 Release 会 403。
+permissions:
+  contents: write
+
 jobs:
   build:
     name: ${{ matrix.os }}
