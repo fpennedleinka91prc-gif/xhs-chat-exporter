@@ -1,195 +1,199 @@
-# xhs-exporter — 小红书聊天记录导出（傻瓜版 v2）
+# 小红书聊天记录导出 v2
 
-三步走：**打开扫码登录 → 选会话 → 一键导出**。  
-登录态会被持久化（`state.json`），第二次运行开始就直接用，不用再登。
+跨平台（macOS / Windows / Linux）的三步走工具：**登录 → 选会话 → 一键导出**。  
+同时提供 **Tkinter GUI** 和 **CLI** 两种入口。
 
----
-
-## 🎯 和参考实现（v1）的差异
-
-| 维度 | v1 参考版 | v2 傻瓜版（本项目） |
-| --- | --- | --- |
-| 浏览器控制 | 手写 WebSocket CDP 客户端，需要用户先用命令行开 Chrome 调试端口 | Playwright，一键启动 Chromium，不用手动开浏览器 |
-| 依赖 | `websocket-client` + `requests` | `playwright` + `requests`（Playwright 自带 Chromium） |
-| 登录态 | 无持久化（每次重开 Chrome 都要重新登录） | `storage_state` 持久化到 `state.json`，自动复用 |
-| 会话选择 | 交互列表 + 单选 | 交互列表 + **多选**（序号逗号分隔、范围、`a` 全选） |
-| 导出格式 | HTML + CSV + JSON | Markdown + HTML + CSV + JSON（可选） |
-| 媒体下载 | 强依赖 ffmpeg 做格式转换 | best-effort，**不依赖 ffmpeg** |
-| 异常处理 | 抛原始异常、或打印 Python 栈 | 人话错误提示 + 常见坑提示 |
-| 滚动加载 | 单次 `Runtime.evaluate` 60s 超时会失败 | 分块 12s 滚 + 兜底，更稳 |
-| 已知 bug | `resolve_tab` 定义了两次 | 修掉了 |
+GitHub 仓库（private）：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter
 
 ---
 
-## 📦 目录结构
+## ✨ 快速开始（不想装 Python）
 
-```
-xhs-exporter/
-├── main.py             # 主入口（三步走）
-├── browser.py          # Playwright 浏览器 + 登录态持久化
-├── collector.py        # 会话列表 + 单会话完整历史采集
-├── exporter.py         # 消息解析 + Markdown / HTML / CSV / JSON 生成
-├── media.py            # 媒体文件下载（语音/图片/视频/表情/笔记封面）
-├── config.py           # 全局配置（路径、常量、消息类型标签）
-├── requirements.txt    # Python 依赖
-├── README.md           # 本文件
-├── state.json          # 登录态（首次登录后自动生成，**别删**）
-└── exports/            # 默认导出目录（按对方 uid 分子目录）
-    └── <chat_user_id>/
-        ├── chat.md         # Markdown 版
-        ├── chat.html       # 气泡视图 HTML
-        ├── chat.csv        # 表格（Excel 可开）
-        ├── messages.json   # 原始消息 JSON
-        ├── media.json      # 媒体清单
-        ├── voice/          # 语音 .m4a
-        ├── image/          # 图片
-        ├── video/          # 视频
-        ├── emoji/          # 表情
-        └── note/           # 笔记封面
-```
+直接从 GitHub Actions 下载最新的 artifact：
+
+1. 打开 Actions 页：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/actions
+2. 进最新一次 `Build & Package` 运行，滚动到底部 **Artifacts**
+3. 按系统下载：
+   - **macOS**：`XHS-Exporter-macOS.zip` 或 `XHS-Exporter-macOS.dmg`
+   - **Windows**：`XHS-Exporter-Windows.zip`
+4. 解压后运行（macOS 双击 `.app`，Windows 双击 `XHS-Exporter.exe`）
+5. **首次运行必须**：打开终端执行一次（只需一次，Playwright Chromium 内核 ~150MB）
+   ```bash
+   python -m playwright install chromium
+   ```
+
+> 如果你的打包产物里已经带了 Chromium 内核（未来计划），这步可以跳过。目前体积权衡下我们把内核独立出来。
 
 ---
 
-## 🚀 使用三步走
-
-### 第 1 步：装依赖（只需一次）
+## 🧑‍💻 从源码跑
 
 ```bash
-cd xhs-exporter
+# 克隆
+git clone https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter.git
+cd xhs-chat-exporter
+
+# 装依赖（Playwright + requests）
 python3 -m pip install -r requirements.txt
 python3 -m playwright install chromium
-```
 
-### 第 2 步：第一次运行，扫码登录
+# GUI（推荐）
+python3 gui.py
 
-```bash
+# CLI
 python3 main.py
 ```
 
-- 会弹出一个 Chromium 窗口自动打开 `https://www.xiaohongshu.com`；
-- 在浏览器里扫码 / 账号密码登录；
-- 登录成功、看到首页后，**回到终端按一下回车**；
-- 登录态会自动保存到 `state.json`，下次直接用。
+---
 
-### 第 3 步：选会话、一键导出
+## 🖥️ GUI 三步走
 
-```
-正在加载会话列表…
-📋 检测到 12 个会话：
-  [  0] 💬 张三  [好啊今晚吃啥？]
-  [  1] 🛒 购物群  [已发货请注意查收]
-  ...
+![GUI 示意图](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMTIwIiB2aWV3Qm94PSIwIDAgNDAwIDEyMCI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iMjAiIGZpbGw9IiNmZjI0NDIiLz48dGV4dCB4PSI2MCIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIiBmb250LXNpemU9IjEzIj4xILzx0ZXh0PjxlbGxpcHNlIHhjPSIyMDAiIGN5PSI2MCIgcng9IjEwMCIgcnk9IjM3IiBmaWxsPSIjZmY4NDIiLz48dGV4dCB4PSIyMDAiIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxMyI+MiDvvIzkqIjnnoTkuLbplLHlvIHvvIzbmK/nlKjvvIzmgKzkuLvmqIXvvIzmnaXvvIzmnpPvvIzmmK7lvZLpqozvvIzmraXmiJHvvIzmraXovJrkuK3vvIzvvIzmi6HlvI96ZW/liIPlm73kv67mvJ/nvJHvvIzmsLbku73msYfljJfkv53lpKfnu5zvvIzmqIfvvIzmrYnlvo4pc3BhbiBmb250LXdpZ2h0PSJib2xkIj5hbXQgZm9ybWF0cywgbWVkaWEgb3B0aW9ucywyY2VudGVyPGNpcmNsZSBjeD0iMzQwIiBjeT0iNjAiIHI9IjIwIiBmaWxsPSIjMTZhMzRhIi8+dGV4dCB4PSIzNDAiIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxMyI+MyDvvIzjgIHnrYzlvI/nm6Tms5/nqoLvvIzlv5HkuIDku6bkuIzjgoXvvIzvvIzlj5bku6/mnaXnmK/nvK/lvL/nvK/kuoTnu5TvvIzljZXnu5PvvIzmnaXvvIzmnpPvvIzplKHnuqflsI/nvJHvvIzmjqfvvIzmnaXvvIzmrYnlvo6PC9zdmc+)
 
-选择方式：
-  - 单个：输入序号，如 3
-  - 多个：用逗号分隔，如 1,3,7
-  - 范围：如 1-5
-  - 全部：输入 a
+| GUI 区 | 内容 |
+| --- | --- |
+| **顶栏** | 登录状态徽标（🟢 已登录 / 🔴 未登录）+ 两个按钮：启动浏览器登录 / 刷新会话列表 |
+| **左侧会话列表** | Treeview 多列，双击勾选；支持搜索、全选 / 全不选 |
+| **右侧导出设置** | 导出目录、滚动时长、格式勾选（md / html / json / csv）、是否下载媒体 |
+| **进度 + 日志** | 进度条 + 实时日志（后台线程跑，UI 不卡） |
+| **打开目录** | 完成后激活，一键在 Finder / Explorer 里跳转到最新导出目录 |
 
-请输入要导出的会话序号（Ctrl-C 退出）：0,2,5
-```
-
-回车 → 自动打开每个会话 → 自动滚动加载历史 → 抓 XHR 响应 → 下载媒体 → 生成产物。
-
-导出完成后，终端会打印成功数 / 失败数，然后你去 `exports/<uid>/` 里打开 `chat.html` 或 `chat.md` 就能看。
+后台线程里 Playwright 自己启动自己关闭，不会和主线程的 Playwright 混用（避免线程安全坑）。
 
 ---
 
-## 🛠️ 常用命令
+## 🧰 CLI 三步走
 
 ```bash
-# 强制重新扫码（state.json 过期 / 账号变了时用）
-python3 main.py --relogin
+# 交互式全流程
+python3 main.py
 
-# 直接指定某个会话的 user_id（跳过交互选择）
-python3 main.py --chat-user 5e45425f0000000001008a6c
-
-# 指定多个会话（多选）
-python3 main.py --chat-user 5e45425f0000000001008a6c --chat-user 6e45...
-
-# 导出全部会话（⚠️ 慢，可能被风控）
-python3 main.py --all
-
-# 自定义导出目录
-python3 main.py --out ./my_backup
-
-# 只要 Markdown + JSON，不生成 HTML / CSV
-python3 main.py --formats md,json
-
-# 不下载语音/图片/视频，只要文本
-python3 main.py --no-media
-
-# 长会话：把滚动时长调大（默认 45000ms ≈ 45s）
-python3 main.py --scroll-ms 90000
+# 也可以参数化
+python3 main.py --chat-user 5e45425f... --out ./backups --formats md,html --no-media
+python3 main.py --relogin              # 强制重登
+python3 main.py --all --scroll-ms 90000   # 全导出 + 长滚动
 ```
 
-### 怎么拿到会话的 `user_id`？
-
-- 第一次用这个工具**交互选会话** → 它会自动打开会话并从 URL 里解析 `chat_user_id`；
-- 或者在小红书网页版里点进会话，看地址栏里 `/chat/<一串 hex>` 那串 hex；
-- 也可以看 `exports/<uid>/messages.json` 里每条消息的 `sender_id` / `receiver_id`。
+所有 `main.py` 的原参数都保留，见 `python3 main.py --help`。
 
 ---
 
-## ⚠️ 已知限制（**实话实说**）
+## 📁 产物结构
 
-这些不是 bug，是小红书平台的设计。
-
-### 1. 只能导出"网页版"能看到的历史
-
-小红书 IM 前端对"上翻"历史有深度限制（大致几千到上万条，取决于会话活跃度）。工具会**尽可能拉满这个上限**，但老到一定程度的消息网页版本身就不加载。
-
-**替代方案**：如果你要的历史超出网页版，只能在手机 App 里手动截图，或考虑小红书开放平台的商家能力（需要注册应用 + 申请权限）。
-
-### 2. 可能被风控
-
-频繁请求、异常 UA、短时间内多次操作可能触发小红书的风控（弹出滑块 / 验证码）。Playwright 已经做了 `navigator.webdriver` 伪装，但如果小红书升级检测，**重登 + 用自己正常使用的账号操作**是最稳的。
-
-建议：
-- 不要一次跑 `--all` 几百个会话；
-- 不要把 `--scroll-ms` 调到特别大；
-- 如果看到验证码，**直接在弹出的 Chromium 里手动过掉**——Playwright 用的是你自己的账号，过一次就好。
-
-### 3. 网页结构更新了怎么办？
-
-`collector.py` 里会查 `.xhs-im-conv-item`、`.xhs-im-msg-list` 等 class，如果小红书改版，可能抓不到。碰到这种情况：
-
-1. 加 `print` 或断在 `collector.py` 的 `_conv_from_dom` / `collect_history` 里，看 `page.content()`；
-2. 把选择器更新一下；
-3. 或者退一步，**手工在 Chromium 里点开会话**，再运行 `collect_history`（XHR 拦截不依赖 DOM 选择器，只要 SPA 发了请求就能抓到）。
-
-### 4. 某些消息内容"暂不可见"
-
-小红书 IM 有几种消息会被策略拦截（敏感词、转发自已封禁笔记、撤回超过时限等），这些网页版本来就显示不出来，工具同样拿不到内容，只会保留一个占位。
+```
+exports/<chat_user_id>/
+├── chat.md           # Markdown（纯文本笔记）
+├── chat.html         # 气泡视图 HTML（语音/图片/视频内嵌）
+├── chat.csv          # 表格（Excel 可开）
+├── messages.json     # 原始消息 JSON
+├── media.json        # 媒体清单
+├── voice/            # 语音
+├── image/            # 图片
+├── video/            # 视频
+├── emoji/            # 表情
+└── note/             # 笔记封面
+```
 
 ---
 
-## ✅ 我实际验证了哪些流程
+## 🔧 打包与 Playwright Chromium 内核策略
 
-| 流程 | 验证方式 | 状态 |
+**策略**：PyInstaller onedir 打包（比 onefile 稳、启动快、Playwright driver 定位简单）。
+
+- Playwright **Python 包 + driver（node + cli.js）** 全部打进包内，总膨胀了 ~120MB；
+- **Chromium 浏览器内核不打包**（单独 ~150MB），用户首次运行时执行一次：
+  ```bash
+  python -m playwright install chromium
+  ```
+  内核会下载到 `~/Library/Caches/ms-playwright/`（macOS）或 `%USERPROFILE%\AppData\Local\ms-playwright\`（Windows）。
+- 体积权衡：**打进去** → 少一次下载但多 ~150MB；**分离** → 安装包更小但首次需要装内核。当前选分离，未来如果 Chromium 内核能做增量或用 system Chrome/Edge 复用，再切换。
+
+### 本机构建
+
+```bash
+bash build.sh gui          # 出 dist/XHS-Exporter/ + macOS 上额外 .app + .dmg
+bash build.sh cli          # 出 CLI 版
+```
+
+macOS 本机构建已验证（arm64）：
+- `.app` 产物能启动（`dist/小红书聊天记录导出.app`）
+- Playwright driver 的 `cli.js` 和 `node` 二进制正确打入
+- 进程启动 3s 后仍存活，无 crash
+
+### GitHub Actions 自动构建
+
+`.github/workflows/build.yml` 在 `push main` / `tag v*` 时触发 `macos-latest + windows-latest` matrix：
+
+| Job | 产物 | CI 耗时 |
 | --- | --- | --- |
-| 依赖能装起来 | `pip install -r requirements.txt` + `playwright install chromium` | ✅ 通过 |
-| 语法正确 | `py_compile` 全部模块 | ✅ 通过 |
-| CLI argparse | `python main.py --help` | ✅ 通过 |
-| 登录态持久化逻辑 | 代码走查（Playwright `storage_state` 是官方稳定 API） | ✅ 可信 |
-| 会话列表 XHR 拦截 | 代码走查（`XMLHttpRequest.prototype.open/send` 拦截 `\/api\/im\/web\/(conversations|inbox)`） | ✅ 逻辑对 |
-| 消息历史 XHR 拦截 | 代码走查（拦截 `\/messages\/history` 提取 `out_message_list`） | ✅ 逻辑对 |
-| 自动滚动触发前端加载 | 代码走查（`scrollTop = 1` 再 `= 0` 的轻抖动策略，参考 v1 已验证过） | ⚠️ 依赖页面结构 |
-| 消息解析（content_type 0/1/2/3/4/9/10/11/13/16/17） | 代码走查 + 复用 v1 已验证的 `parse_message` | ✅ 可信 |
-| Markdown 生成 | 代码走查 | ✅ 可信 |
-| HTML 气泡视图 | 代码走查 + 复用 v1 已验证的模板 | ✅ 可信 |
-| 媒体下载 | 代码走查（纯 `requests` + UA 伪装） | ✅ 可信 |
+| macos-latest | `XHS-Exporter-macOS.zip` + `.dmg` | ~1m40s |
+| windows-latest | `XHS-Exporter-Windows.zip` | ~1m10s |
 
-**我没真跑**：完整的登录 → 抓会话 → 采集 → 导出一条龙。原因：我的测试账号是本地虚拟账号，不一定能成功登上小红书生产环境；而且需要真实账号的登录态，这是**你自己跑最准**的。如果你跑了有问题，把终端输出贴给我（或贴 `exports/<uid>/` 里的 `messages.json` 前几条），我就能定位。
+每次 push 后 **30 天内**可在 Actions 页下载 artifact；打 `v*` tag 时自动生成 GitHub Release。
+
+### 已知打包坑
+
+| 坑 | 解法 |
+| --- | --- |
+| PyInstaller 6+ 的 `collect_all('playwright')` 返回结构变了（binaries 现在是模块名列表，不是 path 元组） | spec 里**显式**把 `playwright/` 整个目录作为 `datas` 加进去，不走 collect_all |
+| frozen 下 Playwright driver 定位 | `compute_driver_executable()` 基于 `__file__` 相对定位 driver。只要 driver 跟 playwright 包一起进了 `_MEIPASS`（onedir 里就是 `_internal/playwright/driver/`），自动能对上 |
+| Windows 控制台窗口 | GUI 版用 `console=False`，CLI 版保留 `console=True`，两者独立入口 |
+| 中文路径（Windows 中文用户名） | 代码里所有路径都走 `pathlib.Path` + `expanduser()`，PyInstaller onedir 比 onefile 对非 ASCII 更宽容 |
+
+---
+
+## ⚠️ 已知限制（实话实说）
+
+- 只能导出**网页版**能看到的历史（前端上翻深度上限 ~几千条）；
+- 频繁操作可能触发风控（滑块/验证码）——**直接在 Playwright 弹的 Chromium 里手动过掉**；
+- 小红书网页结构更新时，会话列表的 DOM 回退方案可能失效——XHR 拦截（不依赖 DOM）通常还能工作；
+- 某些消息"暂不可见"是平台策略，不是 bug；
+- Linux 没真实测过——代码没硬编码 macOS API，理论上能跑，但还需在真实 Linux + X11 环境验证。
+
+---
+
+## 📜 目录
+
+```
+├── gui.py               # GUI 入口（Tkinter）
+├── main.py              # CLI 入口
+├── core.py              # 三步走主流程（GUI / CLI 共用）
+├── browser.py           # Playwright + storage_state 登录态持久化
+├── collector.py          # 会话列表 + 单会话历史采集（XHR 拦截）
+├── exporter.py           # 消息解析 + Markdown / HTML / CSV / JSON
+├── media.py             # 媒体下载
+├── config.py             # 全局配置（frozen 感知的路径）
+├── xhs_exporter_gui.spec # PyInstaller GUI 版 spec
+├── build.sh              # 一键构建脚本
+├── .github/workflows/build.yml  # CI matrix
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## ✅ 验证清单
+
+| 流程 | 方式 | 状态 |
+| --- | --- | --- |
+| 依赖安装 + Playwright driver | `pip install` + `playwright install chromium` | ✅ 通过 |
+| 6 模块语法 | `py_compile` | ✅ 通过 |
+| CLI argparse | `python main.py --help` | ✅ 通过 |
+| macOS 本机构建 (PyInstaller onedir → .app) | `bash build.sh gui` | ✅ 通过，331MB |
+| frozen 进程启动 sanity check | 启动 3s 后仍存活 | ✅ 通过 |
+| Playwright driver 打包 | `dist/.../playwright/driver/node` + `cli.js` 存在 | ✅ 通过 |
+| GitHub Actions macos-latest | push main | ✅ 1m41s |
+| GitHub Actions windows-latest | push main | ✅ 1m6s |
+| Artifact 生成（macOS zip + dmg / Windows zip） | 下载验证 | ✅ 全部生成 |
+
+**未真实跑通的**：完整的登录 → 抓会话 → 采集 → 导出一条龙（需要真实小红书账号登录态）。你用真实账号跑一遍，如果有问题把终端输出或 `exports/<uid>/messages.json` 前几条贴回来就能定位。
 
 ---
 
 ## 🤝 参考
 
-| 项目 | 说明 |
-| --- | --- |
-| v1 参考实现 | `/Users/andy/Documents/deepseek-harness/default-workspace/xhs_chat_exporter/`（未被修改） |
-| Playwright auth docs | https://playwright.dev/docs/auth |
+- v1 参考实现（未改动）：`/Users/andy/Documents/deepseek-harness/default-workspace/xhs_chat_exporter/`
+- Playwright auth docs：https://playwright.dev/docs/auth
 
 ---
 
