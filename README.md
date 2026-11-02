@@ -1,9 +1,15 @@
 # 小红书聊天记录导出 v2
 
+> 送给那些因为小红书结识了一个人、聊了几万条、最后却走散了的人。
+> 希望这个工具能帮你留住那些不想忘掉的字。成全别人的爱情、友情。
+
 跨平台（macOS / Windows / Linux）的三步走工具：**登录 → 选会话 → 一键导出**。  
 同时提供 **Tkinter GUI** 和 **CLI** 两种入口。
 
-GitHub 仓库（private）：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter
+GitHub 仓库：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter
+<!-- 如有问题可提 Issue，或直接联系仓库 owner -->
+[![Stars](https://img.shields.io/github/stars/fpennedleinka91prc-gif/xhs-chat-exporter)](https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/stargazers)
+[![CI](https://img.shields.io/github/actions/workflow/status/fpennedleinka91prc-gif/xhs-chat-exporter/.github/workflows/build.yml?label=Build)](https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/actions)
 
 ---
 
