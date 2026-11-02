@@ -1,0 +1,116 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "同时创建 Release（仅对 tag push 有效）"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+        shell: bash
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install chromium
+        shell: bash
+
+      - name: Install create-dmg (macOS only)
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
+      - name: Build GUI onedir
+        run: |
+          pyinstaller --noconfirm --clean xhs_exporter_gui.spec
+          ls -la dist/
+        shell: bash
+
+      - name: Zip artifacts
+        id: zip
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            # macOS：打包 .app + 生成 DMG（如果 create-dmg 装好了）
+            APP="dist/小红书聊天记录导出.app"
+            if [ -d "$APP" ]; then
+              zip -r "XHS-Exporter-macOS.zip" "$APP" -x "*.DS_Store"
+            fi
+            if command -v create-dmg >/dev/null 2>&1 && [ -d "$APP" ]; then
+              rm -f "XHS-Exporter-macOS.dmg"
+              create-dmg \
+                --volname "小红书聊天记录导出" \
+                --window-size 500 320 \
+                --icon-size 100 \
+                --app-drop-link 400 150 \
+                "XHS-Exporter-macOS.dmg" \
+                "$APP" || echo "⚠️ create-dmg 失败"
+            fi
+          else
+            # Windows / Linux：打包 onedir 目录
+            cd dist
+            7z a -r "../XHS-Exporter-${{ runner.os }}.zip" XHS-Exporter || \
+            tar czf "../XHS-Exporter-${{ runner.os }}.tar.gz" XHS-Exporter
+            cd ..
+          fi
+          ls -la XHS-Exporter-*.zip XHS-Exporter-*.dmg 2>/dev/null || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: XHS-Exporter-${{ matrix.os }}
+          path: |
+            XHS-Exporter-*.zip
+            XHS-Exporter-*.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create Release (tag only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: XHS Exporter ${{ github.ref_name }}
+          body: |
+            ## 小红书聊天记录导出 v2 ${{ github.ref_name }}
+
+            跨平台 GUI + CLI。安装后首次运行会自动检测 Playwright Chromium 内核。
+            如果提示缺少浏览器，在终端执行：
+            ```bash
+            python -m playwright install chromium
+            ```
+
+            每个压缩包的内容：
+            - **macOS**：`.app`（双击即开）或 `.dmg`（拉到 Applications）
+            - **Windows**：解压后运行 `XHS-Exporter/XHS-Exporter.exe`
+          files: |
+            XHS-Exporter-*.zip
+            XHS-Exporter-*.dmg

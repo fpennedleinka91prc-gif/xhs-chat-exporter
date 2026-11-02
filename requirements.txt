@@ -1,0 +1,6 @@
+# -*- coding: utf-8 -*-
+playwright>=1.40.0
+requests>=2.28.0
+
+# 开发 / 打包（可选）：用户需要 GUI / 打包才用得到
+# pip install ".[dev]"  或  pip install pyinstaller

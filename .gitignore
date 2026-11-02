@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+
+# 本地运行产物
+state.json            # 登录态（敏感，不进 git）
+exports/              # 导出目录
+*.log
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+*.manifest
+
+# Playwright 浏览器内核（CI 会在构建时 install）
+.cache/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
