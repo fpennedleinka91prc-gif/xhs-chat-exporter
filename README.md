@@ -196,9 +196,28 @@ macOS 本机构建已验证（arm64）：
 
 ---
 
+## 💬 关于 / 联系
+
+**为什么开源**：这个工具最初是给一个因为小红书结识、聊了几万条、最后却走散了的人做的。后来觉得——也许还有别的人，也想留住那些不想忘掉的字。成全别人的爱情、友情。所以把它公开了。
+
+**遇到问题？**
+- 在 GitHub 上 [提 Issue](https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/issues)；
+- 或在 [Discussions](https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/discussions) 聊你的故事、提改进建议。
+
+**想联系作者本人？**
+- GitHub profile 上可以发 DM；
+- 小红书账号：**待补充**（如果你看到这条、愿意让大家找到你，提个 Issue 说一声）。
+
+**欢迎 Star / Fork / PR**。特别是：
+- 帮你修跨平台兼容（Linux 实测、Windows 编码路径）；
+- 帮你补 UI / 打包优化 / 新导出格式；
+- 帮你验证更多小红书会话类型（群聊、笔记分享卡片、通话记录、直播邀请卡等）。
+
+---
+
 ## 🤝 参考
 
-- v1 参考实现（未改动）：`/Users/andy/Documents/deepseek-harness/default-workspace/xhs_chat_exporter/`
+- v1 参考实现（本项目的前身，思路来源）：原仓库不在公开互联网上，这里保留其核心设计思路供代码注释参考；
 - Playwright auth docs：https://playwright.dev/docs/auth
 
 ---
