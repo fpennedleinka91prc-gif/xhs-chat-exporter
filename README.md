@@ -13,22 +13,22 @@ GitHub 仓库：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter
 
 ---
 
-## ✨ 快速开始（不想装 Python）
+## ⚡ 下载即用（v2.1.0+）
 
-直接从 GitHub Actions 下载最新的 artifact：
+直接从 [GitHub Releases](https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/releases) 下载最新版安装包：
 
-1. 打开 Actions 页：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter/actions
-2. 进最新一次 `Build & Package` 运行，滚动到底部 **Artifacts**
-3. 按系统下载：
-   - **macOS**：`XHS-Exporter-macOS.zip` 或 `XHS-Exporter-macOS.dmg`
+1. 打开最新 Release 页
+2. 按系统下载：
+   - **macOS**：`XHS-Exporter-macOS.dmg`（拉到 Applications）或 `.zip`（解压即开）
    - **Windows**：`XHS-Exporter-Windows.zip`
-4. 解压后运行（macOS 双击 `.app`，Windows 双击 `XHS-Exporter.exe`）
-5. **首次运行必须**：打开终端执行一次（只需一次，Playwright Chromium 内核 ~150MB）
-   ```bash
-   python -m playwright install chromium
-   ```
+3. 双击启动 → 扫码登录 → 选会话 → 导出
 
-> 如果你的打包产物里已经带了 Chromium 内核（未来计划），这步可以跳过。目前体积权衡下我们把内核独立出来。
+> ✅ **v2.1.0+ Chromium 内核已随包打包**，无需安装 Python / Playwright，下载即用。
+>
+> 体积大（解压后 ~400–700MB）主要因为浏览器内核（~550MB），但零依赖开箱即用。
+>
+> macOS 首次启动如被 Gatekeeper 拦截：右键 → 打开 → 继续；或在「系统设置 → 隐私与安全」里放行。
+> Windows Defender 可能提示未知发布者（自签名证书），忽略即可。
 
 ---
 
@@ -39,15 +39,28 @@ GitHub 仓库：https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter
 git clone https://github.com/fpennedleinka91prc-gif/xhs-chat-exporter.git
 cd xhs-chat-exporter
 
-# 装依赖（Playwright + requests）
+# 装依赖
 python3 -m pip install -r requirements.txt
+
+# 源码跑也需要 Chromium
 python3 -m playwright install chromium
 
-# GUI（推荐）
+# GUI
 python3 gui.py
 
 # CLI
 python3 main.py
+```
+
+### 自己打包成可双击安装包
+
+```bash
+# macOS（同时把 Chromium 装进项目内，spec 会自动收集）
+PLAYWRIGHT_BROWSERS_PATH=$(pwd)/browsers python3 -m playwright install chromium
+bash build.sh    # 产出 dist/小红书聊天记录导出.app
+
+# 或直接 PyInstaller
+pyinstaller --noconfirm --clean xhs_exporter_gui.spec
 ```
 
 ---

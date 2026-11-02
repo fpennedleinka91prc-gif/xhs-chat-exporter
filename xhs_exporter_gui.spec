@@ -1,52 +1,48 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec：GUI 版入口 gui.py（无控制台）。
+"""PyInstaller spec：GUI 版入口 gui.py。
 
-用法：
-  pyinstaller xhs_exporter_gui.spec
-  # 产物：dist/XHS-Exporter/（onedir，跨平台通用）
-  # macOS 额外：dist/小红书聊天记录导出.app（BUNDLE）
+Chromium 内核**不**通过 spec 打进包（PyInstaller 会尝试对 mach-o 二进制签名，
+碰到 "Google Chrome for Testing" 这种路径就炸）。
+Chromium 由 build.sh / CI workflow 在 PyInstaller 跑完后手动拷贝到：
+  dist/XHS-Exporter/_internal/browsers/
 
-关键依赖：
-- Playwright 的 driver 是独立 Node 运行时 + cli.js，必须一并打包；
-- Chromium 浏览器内核**不打包**（~150MB），首次运行缺失时，Playwright 会明确提示
-  用户执行 `python -m playwright install chromium`。
-
-注意 PyInstaller 6+ 的 collect_all 返回结构有变，binaries 现在是模块名字符串列表。
-这里显式把 driver 目录按 (src, dest_dir) 加入 datas，避免踩坑。
+运行时 browser.py 通过 _MEIPASS / _internal 定位到这个目录。
 """
 from pathlib import Path
 import playwright
+import sys
 
 block_cipher = None
 
-SPEC_DIR = Path(SPECPATH if 'SPECPATH' in dir() else '.').resolve()
+HERE = Path(SPECPATH if 'SPECPATH' in dir() else '.').resolve()
 PW_PKG = Path(playwright.__file__).resolve().parent
-PW_DRIVER = PW_PKG / 'driver'
 
-# —— datas：Playwright 整个 driver 目录 + 业务源码 ——
+# —— datas：只放 Playwright Python 包 + driver（别放 browsers/，放了会炸）——
 datas = [
-    # Playwright Python 包本身（不只是 driver，因为 compute_driver_executable 依赖它的 __file__）
     (str(PW_PKG), 'playwright'),
 ]
 
-# —— binaries：空，让 PyInstaller 自己分析；Playwright driver 的 node 可执行在 datas 里 ——
-binaries = []
+# —— Chromium 打包检查（只打印，spec 不打）——
+BROWSERS = HERE / 'browsers'
+if BROWSERS.is_dir():
+    chromium_size = sum(f.stat().st_size for f in BROWSERS.rglob('*') if f.is_file()) / 1024 / 1024
+    print(f'[spec] Chromium 内核存在（{chromium_size:.0f}MB），将由 shell 脚本拷贝到 dist/_internal/browsers/')
+else:
+    print('[spec] ⚠️ 没找到 ./browsers/。请先执行：'
+          'PLAYWRIGHT_BROWSERS_PATH=./browsers python3 -m playwright install chromium')
 
-# —— hiddenimports：Playwright 的同步 API 和内部模块 ——
 hiddenimports = [
     'playwright.sync_api',
     'playwright.async_api',
     'playwright._impl._driver',
     'playwright._impl._api_structures',
     'playwright._impl._errors',
-    'playwright._impl._helper',
-    'playwright._impl._transport',
 ]
 
 a = Analysis(
-    [str(SPEC_DIR / 'gui.py')],
-    pathex=[str(SPEC_DIR)],
-    binaries=binaries,
+    [str(HERE / 'gui.py')],
+    pathex=[str(HERE)],
+    binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -84,8 +80,6 @@ coll = COLLECT(
     name='XHS-Exporter',
 )
 
-# macOS：再封一层 .app（其他平台跳过）
-import sys
 if sys.platform == 'darwin':
     app = BUNDLE(
         coll,
@@ -95,8 +89,8 @@ if sys.platform == 'darwin':
         info_plist={
             'CFBundleName': '小红书聊天记录导出',
             'CFBundleDisplayName': '小红书聊天记录导出',
-            'CFBundleShortVersionString': '2.0.0',
-            'CFBundleVersion': '200',
+            'CFBundleShortVersionString': '2.1.0',
+            'CFBundleVersion': '210',
             'NSHighResolutionCapable': True,
             'LSMinimumSystemVersion': '10.15.0',
         },

@@ -16,7 +16,8 @@ dist/
 *.spec.bak
 *.manifest
 
-# Playwright 浏览器内核（CI 会在构建时 install）
+# Playwright 浏览器（本机构建产物，CI 会在构建时安装）
+browsers/
 .cache/
 
 # macOS

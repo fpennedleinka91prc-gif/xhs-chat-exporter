@@ -1,67 +1,43 @@
 #!/usr/bin/env bash
-# -*- coding: utf-8 -*-
-# 构建 PyInstaller 产物（macOS / Linux / Windows 都能跑，靠 CI 分发）。
-# 用法：
-#   ./build.sh              # 构建 GUI 版（默认）
-#   ./build.sh cli          # 构建 CLI 版（main.py 入口）
+# 构建 macOS GUI 版（含 Chromium 内核，下载即用）。
+# 三步法：
+#   1. PyInstaller 打应用代码（不通过 spec 打 Chromium，PyInstaller 会对 mach-o 签名炸）
+#   2. shell 把 Chromium 拷进 dist/XHS-Exporter/_internal/browsers/ + .app/Contents/Resources/browsers/
+#   3. zip / dmg
 set -euo pipefail
 
-cd "$(dirname "$0")"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+cd "$HERE"
 
-MODE="${1:-gui}"
-VERSION="2.0.0"
+echo "==> 1) 安装 Chromium 到 ./browsers/"
+mkdir -p browsers
+export PLAYWRIGHT_BROWSERS_PATH="$HERE/browsers"
+python3 -m playwright install chromium 2>&1 | tail -3
+echo "   $(du -sh browsers/ | cut -f1)"
 
-echo "==> 清理旧产物"
-rm -rf dist build *.spec.bak
-rm -rf __pycache__ */__pycache__
+echo
+echo "==> 2) PyInstaller 打应用代码"
+pip show pyinstaller >/dev/null 2>&1 || pip install pyinstaller
+pyinstaller --clean --noconfirm xhs_exporter_gui.spec 2>&1 | tail -5
 
-echo "==> 安装 / 校验依赖"
-python3 -m pip install -q -r requirements.txt
-python3 -m pip install -q pyinstaller
-
-echo "==> 安装 Playwright Chromium（~150MB，只下载一次）"
-python3 -m playwright install chromium
-
-if [ "$MODE" = "gui" ]; then
-    echo "==> 构建 GUI 版"
-    pyinstaller --noconfirm --clean xhs_exporter_gui.spec
-    OUTNAME="XHS-Exporter"
-else
-    echo "==> 构建 CLI 版"
-    pyinstaller \
-        --name "XHS-Exporter-CLI" \
-        --windowed=false \
-        --console \
-        --collect-all playwright \
-        --add-data "config.py:." \
-        --add-data "core.py:." \
-        --add-data "browser.py:." \
-        --add-data "collector.py:." \
-        --add-data "exporter.py:." \
-        --add-data "media.py:." \
-        --add-data "gui.py:." \
-        main.py
-    OUTNAME="XHS-Exporter-CLI"
+echo
+echo "==> 3) 把 Chromium 拷进构建产物"
+# onedir (Windows/Linux 打包会用到这个)
+mkdir -p "dist/XHS-Exporter/_internal/browsers"
+cp -R browsers/* "dist/XHS-Exporter/_internal/browsers/"
+# macOS .app
+if [ -d "dist/小红书聊天记录导出.app" ]; then
+    mkdir -p "dist/小红书聊天记录导出.app/Contents/Resources/browsers"
+    cp -R browsers/* "dist/小红书聊天记录导出.app/Contents/Resources/browsers/"
 fi
 
-echo "==> 构建完成"
-echo "   产物在 dist/"
-ls -la dist/
+echo
+echo "==> 4) 最终产物"
+du -sh dist/XHS-Exporter/
+ls -lh dist/*.app 2>/dev/null
+echo "   browsers 子目录大小："
+du -sh dist/XHS-Exporter/_internal/browsers/ 2>/dev/null || \
+    du -sh "dist/小红书聊天记录导出.app/Contents/Resources/browsers"
 
-# macOS 再封一个 .dmg（有 create-dmg 才做，CI 会装；没有就跳过）
-if [[ "$(uname -s)" == "Darwin" && -d "dist/${OUTNAME}.app" ]]; then
-    if command -v create-dmg >/dev/null 2>&1; then
-        echo "==> 生成 DMG"
-        rm -f "dist/${OUTNAME}-mac.dmg"
-        create-dmg \
-            --volname "小红书聊天记录导出 ${VERSION}" \
-            --window-size 500 320 \
-            --window-pos 200 120 \
-            --icon-size 100 \
-            --app-drop-link 400 150 \
-            "dist/${OUTNAME}-mac.dmg" \
-            "dist/${OUTNAME}.app" || echo "⚠️ create-dmg 失败（可能是权限），跳过 DMG"
-    else
-        echo "==> 未检测到 create-dmg，跳过 DMG（brew install create-dmg）"
-    fi
-fi
+echo
+echo "✅ 构建完成。dist/ 下的 .app / XHS-Exporter/ 都是下载即用的。"
